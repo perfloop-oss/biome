@@ -304,4 +304,11 @@ function doubleNotCoerce(user: { name: string } | undefined) {
   return !!user;
 }
 
+type BrandedReady = 'ready' & { readonly __brand: unique symbol };
+function switchOnBrandedLiteral(value: BrandedReady) {
+  switch (value) {
+    case 'ready': return 1;
+  }
+}
+
 ```

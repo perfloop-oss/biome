@@ -30,7 +30,7 @@ use biome_html_syntax::HtmlRoot;
 #[cfg(feature = "lang_js")]
 use biome_js_parser::{AnyJsRoot, JsParserOptions};
 #[cfg(feature = "type_inference")]
-use biome_js_type_info::{TypeData, TypeResolver};
+use biome_js_type_info::TypeData;
 use biome_languages::DocumentFileSource;
 #[cfg(all(feature = "module_graph", feature = "lang_html"))]
 use biome_module_graph::HtmlEmbeddedContent;
@@ -53,7 +53,9 @@ use biome_service::projects::Projects;
 use biome_service::settings::ModuleGraphResolutionKind;
 use biome_service::settings::{ServiceLanguage, Settings, SettingsHandle};
 #[cfg(feature = "html_embeds")]
-use biome_service::test_utils::setup_workspace_and_open_project;
+use biome_service::test_utils::{
+    setup_persistent_workspace_and_open_project, setup_workspace_and_open_project,
+};
 #[cfg(feature = "html_embeds")]
 use biome_service::workspace::{
     PullDiagnosticsParams, ScanKind, ScanProjectParams, UpdateSettingsParams,
@@ -750,29 +752,7 @@ fn markup_to_string(markup: biome_console::Markup) -> String {
 }
 
 #[cfg(feature = "type_inference")]
-pub fn dump_registered_types(content: &mut String, resolver: &dyn TypeResolver) {
-    let mut registered_types = String::new();
-    let mut resolver = Some(resolver);
-    while let Some(current_resolver) = resolver {
-        for (i, ty) in current_resolver.registered_types().iter().enumerate() {
-            let level = current_resolver.level();
-            registered_types.push_str(&format!("\n{level:?} TypeId({i}) => {ty}\n"));
-        }
-
-        resolver = current_resolver.fallback_resolver();
-    }
-
-    if !registered_types.is_empty() {
-        content.push_str("## Registered types\n\n");
-
-        content.push_str("```");
-        content.push_str(&registered_types);
-        content.push_str("```\n");
-    }
-}
-
-#[cfg(feature = "type_inference")]
-pub fn dump_registered_module_types(content: &mut String, types: &[&TypeData]) {
+pub fn dump_registered_module_types(content: &mut String, types: &[TypeData]) {
     if types.is_empty() {
         return;
     }
@@ -1183,7 +1163,8 @@ pub fn analyze_with_workspace(
     // Create workspace — use WorkspaceServer directly so we can call
     // index_files_for_test, which opens files with OpenFileReason::Index
     // and populates the module graph (needed by project-domain rules).
-    let (workspace, project_key) = setup_workspace_and_open_project(fs, project_root.as_str());
+    let (workspace, project_key) =
+        setup_persistent_workspace_and_open_project(fs, project_root.as_str());
 
     // Build configuration: enable full HTML support + merge .options.json if present
     let config = build_test_configuration(input_file);

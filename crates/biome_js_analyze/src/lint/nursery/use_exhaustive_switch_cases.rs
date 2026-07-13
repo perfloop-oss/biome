@@ -123,23 +123,22 @@ impl Rule for UseExhaustiveSwitchCases {
             return None;
         }
 
-        let found_cases = cases
-            .iter()
-            .filter_map(|case| match case {
-                AnyJsSwitchClause::JsCaseClause(case) => {
-                    let test = case.test().ok()?;
-                    let variants = ctx
-                        .inferred_type_of_expression(&test)?
-                        .switch_case_variants();
-                    match variants.as_slice() {
-                        [variant] => Some(variant.clone()),
-                        _ => None,
-                    }
-                }
-                _ => None,
-            })
-            .filter(|case| *case != InferredSwitchCase::UnsupportedLiteral)
-            .collect::<Vec<_>>();
+        let mut found_cases = Vec::new();
+        for case in cases.iter() {
+            let AnyJsSwitchClause::JsCaseClause(case) = case else {
+                continue;
+            };
+            let Ok(test) = case.test() else {
+                continue;
+            };
+            let ty = ctx.type_of_expression(&test)?;
+            let variants = ty.try_switch_case_variants()?;
+            if let [variant] = variants.as_slice()
+                && *variant != InferredSwitchCase::UnsupportedLiteral
+            {
+                found_cases.push(variant.clone());
+            }
+        }
 
         let mut missing_cases = Vec::new();
 
@@ -158,8 +157,8 @@ impl Rule for UseExhaustiveSwitchCases {
         };
 
         let variants = ctx
-            .inferred_type_of_expression(&discriminant)?
-            .switch_case_variants();
+            .type_of_expression(&discriminant)?
+            .try_switch_case_variants()?;
 
         for variant in variants {
             if variant == InferredSwitchCase::Boolean {

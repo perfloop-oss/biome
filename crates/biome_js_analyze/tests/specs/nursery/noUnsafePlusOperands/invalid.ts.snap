@@ -75,6 +75,12 @@ let numberAndBigint = 1 + 1n;
 function reqBigInt(x: Required<{b?: bigint}>) { return x.b + 1; }
 function roBigInt(x: Readonly<{b: bigint}>) { return x.b + 1; }
 
+{
+	type BrandedNumber = number & { readonly __brand: unique symbol };
+	declare const value: BrandedNumber;
+	const brandedNumberAndBigint = value + 1n;
+}
+
 ```
 
 # Diagnostics
@@ -281,6 +287,7 @@ invalid.ts:70:54 lint/nursery/noUnsafePlusOperands ━━━━━━━━━�
   > 70 │ function roBigInt(x: Readonly<{b: bigint}>) { return x.b + 1; }
        │                                                      ^^^^^^^
     71 │ 
+    72 │ {
   
   i This operation mixes number with bigint.
   
@@ -288,6 +295,35 @@ invalid.ts:70:54 lint/nursery/noUnsafePlusOperands ━━━━━━━━━�
   > 70 │ function roBigInt(x: Readonly<{b: bigint}>) { return x.b + 1; }
        │                                                      ^^^^^^^
     71 │ 
+    72 │ {
+  
+  i Convert one side so both operands use the same numeric type before applying + or +=.
+  
+  i This rule belongs to the nursery group, which means it is not yet stable and may change in the future. Visit https://biomejs.dev/linter/#nursery for more information.
+  
+
+```
+
+```
+invalid.ts:75:33 lint/nursery/noUnsafePlusOperands ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i Numeric + operations must use either two bigint values or two number values.
+  
+    73 │ 	type BrandedNumber = number & { readonly __brand: unique symbol };
+    74 │ 	declare const value: BrandedNumber;
+  > 75 │ 	const brandedNumberAndBigint = value + 1n;
+       │ 	                               ^^^^^^^^^^
+    76 │ }
+    77 │ 
+  
+  i This operation mixes number & object with bigint.
+  
+    73 │ 	type BrandedNumber = number & { readonly __brand: unique symbol };
+    74 │ 	declare const value: BrandedNumber;
+  > 75 │ 	const brandedNumberAndBigint = value + 1n;
+       │ 	                               ^^^^^^^^^^
+    76 │ }
+    77 │ 
   
   i Convert one side so both operands use the same numeric type before applying + or +=.
   

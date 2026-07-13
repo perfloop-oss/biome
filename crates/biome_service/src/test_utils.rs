@@ -45,6 +45,29 @@ pub fn setup_disposable_workspace_and_open_project(
     (workspace, project_key)
 }
 
+/// Sets up a persistent workspace for tests that scan and index project data.
+pub fn setup_persistent_workspace_and_open_project(
+    fs: impl FileSystem + 'static,
+    project_path: &str,
+) -> (LocalWorkspace, ProjectKey) {
+    let (watcher_tx, _) = unbounded();
+    let (service_tx, _) = watch::channel(ServiceNotification::IndexUpdated);
+    let workspace = LocalWorkspace::new_persistent_for_test(
+        Arc::new(fs),
+        watcher_tx,
+        service_tx,
+        Arc::new(NoopQueryProvider {}),
+        None,
+    );
+    let OpenProjectResult { project_key } = workspace
+        .open_project(OpenProjectParams {
+            path: BiomePath::new(project_path),
+            open_uninitialized: true,
+        })
+        .expect("can open project");
+    (workspace, project_key)
+}
+
 /// Convenience call for setting up the workspace, opening a project, and
 /// getting a receiver for watcher instructions.
 ///

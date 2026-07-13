@@ -9,3 +9,7 @@ text.indexOf(needle) !== 0;
 text.lastIndexOf(needle) === text.length - needle.length;
 text.length - needle.length === text.lastIndexOf(needle);
 text.lastIndexOf("bar") !== text.length - 3;
+
+type BrandedString = string & { readonly __brand: unique symbol };
+declare const brandedText: BrandedString;
+brandedText.indexOf(needle) === 0;

@@ -68,3 +68,9 @@ let numberAndBigint = 1 + 1n;
 
 function reqBigInt(x: Required<{b?: bigint}>) { return x.b + 1; }
 function roBigInt(x: Readonly<{b: bigint}>) { return x.b + 1; }
+
+{
+	type BrandedNumber = number & { readonly __brand: unique symbol };
+	declare const value: BrandedNumber;
+	const brandedNumberAndBigint = value + 1n;
+}

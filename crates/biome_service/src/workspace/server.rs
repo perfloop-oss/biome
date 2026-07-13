@@ -394,6 +394,21 @@ impl LocalWorkspace {
         }
     }
 
+    /// Creates a workspace backed by the persistent database used by the LSP.
+    #[cfg(feature = "testing")]
+    pub fn new_persistent_for_test(
+        fs: Arc<dyn FsWithResolverProxy>,
+        watcher_tx: Sender<WatcherInstruction>,
+        notification_tx: watch::Sender<ServiceNotification>,
+        search_provider: Arc<dyn SearchQuery>,
+        threads: Option<usize>,
+    ) -> Self {
+        Self {
+            server: WorkspaceServer::new(fs, watcher_tx, notification_tx, search_provider, threads),
+            db_state: db::DbState::lsp(),
+        }
+    }
+
     fn as_workspace(&self) -> WorkspaceServerWithDb<'_> {
         self.server.with_db_state(&self.db_state)
     }
