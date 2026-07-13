@@ -138,6 +138,7 @@ impl Rule for UseExhaustiveSwitchCases {
                 }
                 _ => None,
             })
+            .filter(|case| *case != InferredSwitchCase::UnsupportedLiteral)
             .collect::<Vec<_>>();
 
         let mut missing_cases = Vec::new();
@@ -297,6 +298,7 @@ impl Display for MissingCase {
             InferredSwitchCase::BooleanLiteral(value) => {
                 formatter.write_str(if *value { "true" } else { "false" })
             }
+            InferredSwitchCase::BigInt(bigint) => formatter.write_str(bigint.text()),
             InferredSwitchCase::Number(number) => formatter.write_str(number.text()),
             InferredSwitchCase::String(string) => {
                 formatter.write_fmt(format_args!("\"{}\"", string.text()))
@@ -326,6 +328,7 @@ fn missing_case_to_expression(case: &MissingCase) -> Option<AnyJsExpression> {
                 make::js_number_literal_expression(make::js_number_literal(number.text())).into(),
             ),
         ),
+        MissingCase(InferredSwitchCase::BigInt(_)) => None,
         MissingCase(InferredSwitchCase::String(string)) => Some(
             AnyJsExpression::AnyJsLiteralExpression(
                 make::js_string_literal_expression(make::js_string_literal(string.text())).into(),

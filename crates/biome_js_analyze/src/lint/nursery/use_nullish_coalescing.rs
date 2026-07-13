@@ -756,11 +756,12 @@ fn run_ternary(
         check_ternary_nullish_pattern(&test, &consequent, &alternate)?;
 
     let options = ctx.options();
-    if options.has_any_ignore_primitives() {
-        let checked_ty = ctx.inferred_type_of_expression(&checked_expr)?;
-        if should_ignore_for_primitives(options, checked_ty) {
-            return None;
-        }
+    if options.has_any_ignore_primitives()
+        && ctx
+            .inferred_type_of_expression(&checked_expr)
+            .is_some_and(|ty| should_ignore_for_primitives(options, ty))
+    {
+        return None;
     }
 
     // The fix is unsafe when the checked expression contains calls or `new`, because
@@ -773,13 +774,12 @@ fn run_ternary(
             NullishCheckKind::Loose | NullishCheckKind::Compound => true,
             // A single strict check only covers one nullish variant. The fix to `??`
             // is safe only if the type cannot be the opposite variant.
-            NullishCheckKind::StrictSingle(lit) => {
-                let ty = ctx.inferred_type_of_expression(&checked_expr)?;
-                match lit {
+            NullishCheckKind::StrictSingle(lit) => ctx
+                .inferred_type_of_expression(&checked_expr)
+                .is_some_and(|ty| match lit {
                     NullishLiteral::Null => !ty.has_undefined_variant(),
                     NullishLiteral::Undefined => !ty.has_null_variant(),
-                }
-            }
+                }),
         };
 
     Some(UseNullishCoalescingState::Ternary {

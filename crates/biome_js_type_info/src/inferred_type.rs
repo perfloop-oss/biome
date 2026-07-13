@@ -11,6 +11,7 @@ const MAX_TYPE_VARIANT_STEPS: usize = 1024;
 pub enum InferredSwitchCase {
     Boolean,
     BooleanLiteral(bool),
+    BigInt(Text),
     Number(Text),
     String(Text),
     Null,
@@ -59,6 +60,14 @@ pub struct MisleadingReturnType {
 pub struct InferredType<'db> {
     db: &'db dyn TypeDb,
     data: TypeData<'db>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct IgnoredPrimitiveTypes {
+    pub string: bool,
+    pub number: bool,
+    pub boolean: bool,
+    pub bigint: bool,
 }
 
 impl<'db> InferredType<'db> {
@@ -431,7 +440,7 @@ impl<'db> InferredType<'db> {
                 Literal::Number(_) => ignored.number,
                 Literal::Boolean(_) => ignored.boolean,
                 Literal::BigInt(_) => ignored.bigint,
-                _ => false,
+                Literal::Object(_) | Literal::RegExp(_) | Literal::Template(_) => false,
             },
             _ => false,
         })
@@ -508,10 +517,12 @@ impl<'db> InferredType<'db> {
                     Literal::String(string) => {
                         InferredSwitchCase::String(Text::new_owned(string.as_str().into()))
                     }
-                    Literal::BigInt(_)
-                    | Literal::Object(_)
-                    | Literal::RegExp(_)
-                    | Literal::Template(_) => InferredSwitchCase::UnsupportedLiteral,
+                    Literal::BigInt(bigint) => {
+                        InferredSwitchCase::BigInt(canonical_bigint_text(bigint))
+                    }
+                    Literal::Object(_) | Literal::RegExp(_) | Literal::Template(_) => {
+                        InferredSwitchCase::UnsupportedLiteral
+                    }
                 }),
                 TypeData::Null => cases.push(InferredSwitchCase::Null),
                 TypeData::Undefined => cases.push(InferredSwitchCase::Undefined),
@@ -534,7 +545,8 @@ impl<'db> InferredType<'db> {
             }
         }
 
-        cases.dedup();
+        let mut unique_cases = FxHashSet::default();
+        cases.retain(|case| unique_cases.insert(case.clone()));
         cases
     }
 
@@ -840,6 +852,57 @@ impl<'db> InferredType<'db> {
 
         false
     }
+}
+
+fn canonical_bigint_text(text: &Text) -> Text {
+    let raw = text.text().strip_suffix('n').unwrap_or(text.text());
+    let cleaned = raw.replace('_', "");
+    let (negative, unsigned) = cleaned
+        .strip_prefix('-')
+        .map_or((false, cleaned.as_str()), |value| (true, value));
+    let (radix, digits) = if let Some(value) = unsigned.strip_prefix("0x") {
+        (16, value)
+    } else if let Some(value) = unsigned.strip_prefix("0o") {
+        (8, value)
+    } else if let Some(value) = unsigned.strip_prefix("0b") {
+        (2, value)
+    } else {
+        (10, unsigned)
+    };
+
+    let mut decimal = vec![0_u8];
+    for digit in digits.chars() {
+        let Some(digit) = digit.to_digit(radix) else {
+            return text.clone();
+        };
+        let mut carry = digit;
+        for decimal_digit in &mut decimal {
+            let value = u32::from(*decimal_digit) * radix + carry;
+            *decimal_digit = (value % 10) as u8;
+            carry = value / 10;
+        }
+        while carry != 0 {
+            decimal.push((carry % 10) as u8);
+            carry /= 10;
+        }
+    }
+    while decimal.len() > 1 && decimal.last() == Some(&0) {
+        decimal.pop();
+    }
+
+    let is_zero = decimal == [0];
+    let mut result = String::with_capacity(decimal.len() + 2);
+    if negative && !is_zero {
+        result.push('-');
+    }
+    result.extend(
+        decimal
+            .into_iter()
+            .rev()
+            .map(|digit| char::from(b'0' + digit)),
+    );
+    result.push('n');
+    Text::new_owned(result.into())
 }
 
 const MAX_RETURN_TYPE_STEPS: usize = 50;
@@ -1929,6 +1992,6 @@ fn type_description<'db>(db: &'db dyn TypeDb, data: TypeData<'db>) -> String {
         | TypeData::TypeofValue(_)
         | TypeData::Conditional
         | TypeData::Global
-        | TypeData::ThisKeyword => format!("{data:?}"),
+        | TypeData::ThisKeyword => "unknown".into(),
     }
 }
